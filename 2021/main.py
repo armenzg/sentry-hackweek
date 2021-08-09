@@ -22,7 +22,6 @@ def process_data(data):
 
 
 def handle_event(data, headers):
-    return {}, 200
     if headers.get("X-GitHub-Event") != "workflow_job":
         # We return 200 to make webhook not turn red
         return {"reason": "Event not supported."}, 200
@@ -35,6 +34,5 @@ def handle_event(data, headers):
 
 @app.route("/", methods=["POST"])
 def main():
-    print(request.data)
     payload, http_code = handle_event(request.data, request.headers)
     return jsonify(payload), http_code
