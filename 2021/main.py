@@ -34,5 +34,5 @@ def handle_event(data, headers):
 
 @app.route("/", methods=["POST"])
 def main():
-    payload, http_code = handle_event(request.data, request.headers)
+    payload, http_code = handle_event(request.json, request.headers)
     return jsonify(payload), http_code

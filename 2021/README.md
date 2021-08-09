@@ -30,4 +30,4 @@ Install ngrok, authenticate and start it up:
 ngrok http 5000
 ```
 
-Take note of the URL given and create a Github webhook (only `workflow` events) with that URL.
+Take note of the URL given and create a Github webhook (only `workflow` events & make sure to choose `application/json`) with that URL.
