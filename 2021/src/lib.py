@@ -1,41 +1,51 @@
 import time
 
-import requests
+import sentry_sdk
 
-RELAY_DSN = "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451"
+# This will capture issues for this app *and* the manually reported GHA data
+sentry_sdk.init(
+    "https://060c8c7a20ae472c8b32858cb41c36a7@o19635.ingest.sentry.io/5899451",
+    # "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451",
+    traces_sample_rate=1.0,
+    environment="development",
+)
 
-
-def url_from_dsn(dsn, api):
-    base_uri, project_id = dsn.rsplit("/", 1)
-    # '{BASE_URI}/api/{PROJECT_ID}/{ENDPOINT}/'
-    return f"{base_uri}/api/{project_id}/{api}/"
-
+data = {
+    "name": "salutation",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2021-08-09T18:12:37.000Z",
+        "completed_at": "2021-08-09T18:12:40.000Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2021-08-09T18:12:40.000Z",
+        "completed_at": "2021-08-09T18:12:40.000Z"
+      },
+    ],
+}
 
 def send_envelope():
-    envelope = """
-{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc","email":"john@me.com","name":"John Me","comments":"It broke."}\n
-"""
-
-    url = url_from_dsn(RELAY_DSN, "envelope")
-    headers = {
-        "X-Sentry-Auth": "Sentry",
-        "sentry_version": "7",
-        "sentry_client": "0.0.1",
-        "sentry_timestamp": str(time.time()),
-        "sentry_key": RELAY_DSN.rsplit("@", 1)[0].rsplit("//")[-1],
-    }
-
-    req = requests.post(url, data=envelope, headers=headers)
-    import pprint
-
-    pprint.pprint(headers)
-    print(req.text)
+    # sentry_sdk.capture_message("foo")
+    # with sentry_sdk.configure_scope() as scope:
+    #     # XXX: Is this even important?
+    #     scope.transaction = "TempTransaction"
+    for 
+    with sentry_sdk.start_transaction(op="task", name="foo"):
+        # process_item may create more spans internally (see next examples)
+        time.sleep(3)
 
 
 # XXX: When running tests, how can I prevent post requests from happening?
 def process_data(data):
     steps = data["workflow_job"]["steps"]
-    send_envelope()
     for s in steps:
         pass
     return {"reason": "WIP"}, 200
