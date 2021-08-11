@@ -1,6 +1,7 @@
 import io
 import gzip
 import uuid
+import os
 from datetime import datetime
 
 import requests
@@ -8,6 +9,7 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import format_timestamp
 
 RELAY_DSN = "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451"
+GH_TOKEN = os.environ.get("TOKEN")
 
 
 def url_from_dsn(dsn, api):
@@ -26,6 +28,10 @@ def send_envelope(envelope):
         "event_id": uuid.uuid4().hex,  # Does this have to match anything?
         "sent_at": format_timestamp(datetime.utcnow()),
     }
+    if GH_TOKEN:
+        print("Loading Github token")
+        headers["Authorization"] = f"token ${GH_TOKEN}"
+
     url = url_from_dsn(RELAY_DSN, "envelope")
     body = io.BytesIO()
     with gzip.GzipFile(fileobj=body, mode="w") as f:
