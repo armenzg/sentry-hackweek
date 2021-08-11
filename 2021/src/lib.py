@@ -33,33 +33,44 @@ def send_envelope(envelope):
 
     req = requests.post(url, data=body.getvalue(), headers=headers)
     print(url)
-    print(body.getvalue())
+    print(envelope.items)
     print(req.text)
 
 
-def process_step(step):
+# Documentation about traces, transactions and spans
+# https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
+def generate_transaction(wf_info, step):
+    trace_id = uuid.uuid4().hex
+    parent_span_id = uuid.uuid4().hex
     return {
         "event_id": uuid.uuid4().hex,
         "type": "transaction",
-        "transaction": "/organizations/:orgId/performance/:eventSlug/",
-        "start_timestamp": 1597976392.6542819,
-        "timestamp": 1597976400.6189718,
+        # A better name would be desirable than "salutation"
+        "transaction": wf_info["name"],
+        # XXX: Let's hope it can handle YYYY-MM-DD format
+        "start_timestamp": wf_info["started_at"],
+        "timestamp": wf_info["completed_at"],
         "contexts": {
             "trace": {
-                "trace_id": "4C79F60C11214EB38604F4AE0781BFB2",
-                "span_id": "FA90FDEAD5F74052",
+                "op": "workflow",
+                # "trace_id": "4C79F60C11214EB38604F4AE0781BFB2",
+                "trace_id": trace_id,
+                # "span_id": "FA90FDEAD5F74052",
+                "span_id": parent_span_id,
                 "type": "trace",
             }
         },
         "spans": [
             {
-                "description": "<OrganizationContext>",
-                "op": "react.mount",
-                "parent_span_id": "8f5a2b8768cafb4e",
-                "span_id": "bd429c44b67a3eb4",
-                "start_timestamp": 1597976393.4619668,
-                "timestamp": 1597976393.4718769,
-                "trace_id": "ff62a8b040f340bda5d830223def1d81",
+                # op - description
+                # "description": "<OrganizationContext>",
+                "op": step["name"],
+                # "parent_span_id": "8f5a2b8768cafb4e",
+                "parent_span_id": parent_span_id,
+                "span_id": uuid.uuid4().hex,
+                "start_timestamp": step["started_at"],
+                "timestamp": step["completed_at"],
+                "trace_id": trace_id,
             }
         ],
     }
@@ -70,7 +81,8 @@ def process_data(data):
     envelope = Envelope()
     # for s in steps:
     #     print(s["started_at"])
-    envelope.add_transaction(process_step(steps[0]))
+    # Let's only process 1 step
+    envelope.add_transaction(generate_transaction(data["workflow_job"], steps[0]))
     # envelope.add_event({"message": "Hello, World!"})
     send_envelope(envelope)
     return {"reason": "WIP"}, 200
@@ -80,6 +92,8 @@ if __name__ == "__main__":
     process_data(
         {
             "workflow_job": {
+                "started_at": "2021-08-09T18:12:37Z",
+                "completed_at": "2021-08-09T18:12:41Z",
                 "name": "salutation",
                 "steps": [
                     {
