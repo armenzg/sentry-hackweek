@@ -41,7 +41,7 @@ def send_envelope(envelope):
 # https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
 def generate_transaction(wf_info, step):
     trace_id = uuid.uuid4().hex
-    parent_span_id = uuid.uuid4().hex
+    parent_span_id = uuid.uuid4().hex[16:]
     return {
         "event_id": uuid.uuid4().hex,
         "type": "transaction",
@@ -67,7 +67,7 @@ def generate_transaction(wf_info, step):
                 "op": step["name"],
                 # "parent_span_id": "8f5a2b8768cafb4e",
                 "parent_span_id": parent_span_id,
-                "span_id": uuid.uuid4().hex,
+                "span_id": uuid.uuid4().hex[16:],
                 "start_timestamp": step["started_at"],
                 "timestamp": step["completed_at"],
                 "trace_id": trace_id,
