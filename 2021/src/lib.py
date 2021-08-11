@@ -37,7 +37,10 @@ def send_envelope(envelope):
 
 
 def get_extra_metadata(workflow_run):
-    run_data = requests.get(workflow_run).json()
+    req = requests.get(workflow_run)
+    if not req.ok:
+        raise Exception(req.text)
+    run_data = req.json()
     # XXX: We could enrich each transaction by having access to the yml file and/or the logs
     return requests.get(run_data["workflow_url"]).json()
 
@@ -45,9 +48,15 @@ def get_extra_metadata(workflow_run):
 # Documentation about traces, transactions and spans
 # https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
 def generate_transaction(workflow):
-    # This helps to have human friendly transaction names
-    meta = get_extra_metadata(workflow["run_url"])
-    transaction_name = f'{meta["name"]}/{meta["path"].rsplit("/", 1)[-1]}'
+    try:
+        # This helps to have human friendly transaction names
+        meta = get_extra_metadata(workflow["run_url"])
+        transaction_name = f'{meta["name"]}/{workflow["name"]}'
+    except Exception as e:
+        print(e)
+        print(f"Failed to process -> {workflow['run_url']}")
+        transaction_name = {workflow["name"]}
+
     # This can happen when the workflow is skipped and there are no steps
     if not workflow["steps"]:
         print(f"We are ignoring {transaction_name} -> {workflow['html_url']}")
@@ -67,7 +76,7 @@ def generate_transaction(workflow):
         "timestamp": workflow["completed_at"],
         "contexts": {
             "trace": {
-                # "op": meta["path"],
+                "op": workflow["name"],
                 "trace_id": trace_id,
                 "span_id": parent_span_id,
                 "type": "trace",

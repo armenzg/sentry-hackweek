@@ -18,5 +18,10 @@ def handle_event(data, headers):
 
 @app.route("/", methods=["POST"])
 def main():
-    payload, http_code = handle_event(request.json, request.headers)
+    try:
+        payload, http_code = handle_event(request.json, request.headers)
+    except Exception as e:
+        print(e)
+        payload = {}
+        http_code = 200
     return jsonify(payload), http_code
