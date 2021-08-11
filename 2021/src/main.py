@@ -1,6 +1,6 @@
 from flask import jsonify, request, Flask
 
-from lib import process_data
+from .lib import process_data
 
 app = Flask(__name__)
 
