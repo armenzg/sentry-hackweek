@@ -1,7 +1,9 @@
-from src.lib import process_data
+from src.lib import generate_transaction
 from .fixtures import *
 
-
-# XXX: When running tests we will have to mock sending envelopers to relay
-def test_process_data(completed_workflow):
-    assert process_data(completed_workflow) == ({"reason": "WIP"}, 200)
+# XXX: How do we test when timestamps and uuids change?
+# XXX: We also need to deal with requests happening
+def test_generate_transaction(completed_workflow, generated_transaction):
+    assert generate_transaction(completed_workflow["workflow_job"]) == (
+        generated_transaction
+    )
