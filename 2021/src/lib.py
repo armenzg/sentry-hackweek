@@ -33,57 +33,63 @@ def send_envelope(envelope):
 
     req = requests.post(url, data=body.getvalue(), headers=headers)
     print(url)
-    print(envelope.items)
     print(req.text)
 
 
 # Documentation about traces, transactions and spans
 # https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
-def generate_transaction(wf_info, step):
+def generate_transaction(workflow):
     trace_id = uuid.uuid4().hex
     parent_span_id = uuid.uuid4().hex[16:]
-    return {
+    trace = {
+        # "op": workflow["name"], # When missing it uses "default"
+        "trace_id": trace_id,
+        "span_id": parent_span_id,
+        "type": "trace",
+        # XXX: Determine what the failure state should look like
+        "status": "ok" if workflow["conclusion"] else "failed",
+    }
+    spans = []
+    for step in workflow["steps"]:
+        try:
+            spans.append(
+                {
+                    # "description": "<OrganizationContext>",
+                    "op": step["name"],
+                    "parent_span_id": parent_span_id,
+                    "span_id": uuid.uuid4().hex[16:],
+                    "start_timestamp": step["started_at"],
+                    "timestamp": step["completed_at"],
+                    "trace_id": trace_id,
+                }
+            )
+        except Exception as e:
+            # XXX: Deal with this later
+            print(e)
+    transaction = {
         "event_id": uuid.uuid4().hex,
         "type": "transaction",
         # A better name would be desirable than "salutation"
-        "transaction": wf_info["name"],
-        # XXX: Let's hope it can handle YYYY-MM-DD format
-        "start_timestamp": wf_info["started_at"],
-        "timestamp": wf_info["completed_at"],
+        "transaction": workflow["name"],
+        # When processing old data during development, in Sentry's UI, you will
+        # see an error for transactions with "Clock drift detected in SDK";
+        # It is harmeless.
+        "start_timestamp": workflow["started_at"],
+        "timestamp": workflow["completed_at"],
         "contexts": {
-            "trace": {
-                "op": "workflow",
-                # "trace_id": "4C79F60C11214EB38604F4AE0781BFB2",
-                "trace_id": trace_id,
-                # "span_id": "FA90FDEAD5F74052",
-                "span_id": parent_span_id,
-                "type": "trace",
-            }
+            "trace": trace,
         },
-        "spans": [
-            {
-                # op - description
-                # "description": "<OrganizationContext>",
-                "op": step["name"],
-                # "parent_span_id": "8f5a2b8768cafb4e",
-                "parent_span_id": parent_span_id,
-                "span_id": uuid.uuid4().hex[16:],
-                "start_timestamp": step["started_at"],
-                "timestamp": step["completed_at"],
-                "trace_id": trace_id,
-            }
-        ],
+        "spans": spans,
     }
+    import pprint
+
+    pprint.pprint(transaction)
+    return transaction
 
 
 def process_data(data):
-    steps = data["workflow_job"]["steps"]
     envelope = Envelope()
-    # for s in steps:
-    #     print(s["started_at"])
-    # Let's only process 1 step
-    envelope.add_transaction(generate_transaction(data["workflow_job"], steps[0]))
-    # envelope.add_event({"message": "Hello, World!"})
+    envelope.add_transaction(generate_transaction(data["workflow_job"]))
     send_envelope(envelope)
     return {"reason": "WIP"}, 200
 
@@ -92,6 +98,7 @@ if __name__ == "__main__":
     process_data(
         {
             "workflow_job": {
+                "conclusion": "success",
                 "started_at": "2021-08-09T18:12:37Z",
                 "completed_at": "2021-08-09T18:12:41Z",
                 "name": "salutation",
