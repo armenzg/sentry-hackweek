@@ -47,6 +47,11 @@ def get_extra_metadata(workflow_run):
 def generate_transaction(workflow):
     # This helps to have human friendly transaction names
     meta = get_extra_metadata(workflow["run_url"])
+    transaction_name = f'{meta["name"]}/{meta["path"].rsplit("/", 1)[-1]}'
+    # This can happen when the workflow is skipped and there are no steps
+    if not workflow["steps"]:
+        print(f"We are ignoring {transaction_name} -> {workflow['html_url']}")
+        return
 
     trace_id = uuid.uuid4().hex
     parent_span_id = uuid.uuid4().hex[16:]
@@ -54,7 +59,7 @@ def generate_transaction(workflow):
     transaction = {
         "event_id": uuid.uuid4().hex,
         "type": "transaction",
-        "transaction": f'{meta["name"]}/{meta["path"].rsplit("/", 1)[-1]}',
+        "transaction": transaction_name,
         # When processing old data during development, in Sentry's UI, you will
         # see an error for transactions with "Clock drift detected in SDK";
         # It is harmeless.
@@ -103,9 +108,11 @@ def generate_transaction(workflow):
 
 
 def process_data(data):
-    envelope = Envelope()
-    envelope.add_transaction(generate_transaction(data["workflow_job"]))
-    send_envelope(envelope)
+    transaction = generate_transaction(data["workflow_job"])
+    if transaction:
+        envelope = Envelope()
+        envelope.add_transaction(transaction)
+        send_envelope(envelope)
     # XXX: Return something sensiblwe
     return {"reason": "WIP"}, 200
 
