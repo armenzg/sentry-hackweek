@@ -99,7 +99,6 @@ def _generate_spans(steps, parent_span_id, trace_id):
                 }
             )
         except Exception as e:
-            # XXX: Deal with this later
             capture_exception(e)
     return spans
 
