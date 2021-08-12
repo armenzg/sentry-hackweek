@@ -1,5 +1,4 @@
 import json
-from src.lib import process_data
 
 import pytest
 

@@ -1,4 +1,4 @@
-from src.lib import generate_transaction
+from src.workflow_events import generate_transaction
 from .fixtures import *
 
 # XXX: How do we test when timestamps and uuids change?
