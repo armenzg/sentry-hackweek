@@ -12,6 +12,25 @@ RELAY_DSN = "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451"
 GH_TOKEN = os.environ.get("TOKEN")
 
 
+def post(url, body, headers={}):
+    if GH_TOKEN and url.find("github.com") >= 0:
+        headers["Authorization"] = f"token ${GH_TOKEN}"
+    req = requests.post(url, data=body, headers=headers)
+    if not req.ok:
+        raise Exception(req.text)
+    return req
+
+
+def get(url):
+    headers = {}
+    if GH_TOKEN and url.find("github.com") >= 0:
+        headers["Authorization"] = f"token ${GH_TOKEN}"
+    req = requests.get(url, headers=headers)
+    if not req.ok:
+        raise Exception(req.text)
+    return req
+
+
 def url_from_dsn(dsn, api):
     base_uri, project_id = dsn.rsplit("/", 1)
     # '{BASE_URI}/api/{PROJECT_ID}/{ENDPOINT}/'
@@ -20,26 +39,20 @@ def url_from_dsn(dsn, api):
 
 def send_envelope(envelope):
     headers = {
+        "event_id": uuid.uuid4().hex,  # Does this have to match anything?
+        "sent_at": format_timestamp(datetime.utcnow()),
         "Content-Type": "application/x-sentry-envelope",
         "Content-Encoding": "gzip",
         "X-Sentry-Auth": "Sentry sentry_key=060c8c7a20ae472c8b32858cb41c36a7,"
         + f"sentry_client=gha-sentry/0.0.1,sentry_timestamp={str(datetime.utcnow())},"
         + "sentry_version=7",
-        "event_id": uuid.uuid4().hex,  # Does this have to match anything?
-        "sent_at": format_timestamp(datetime.utcnow()),
     }
-    if GH_TOKEN:
-        print("Loading Github token")
-        headers["Authorization"] = f"token ${GH_TOKEN}"
 
-    url = url_from_dsn(RELAY_DSN, "envelope")
     body = io.BytesIO()
     with gzip.GzipFile(fileobj=body, mode="w") as f:
         envelope.serialize_into(f)
 
-    req = requests.post(url, data=body.getvalue(), headers=headers)
-    if not req.ok:
-        print(req.text)
+    post(url_from_dsn(RELAY_DSN, "envelope"), headers=headers, body=body.getvalue())
 
 
 def get_extra_metadata(workflow_run):
@@ -119,6 +132,7 @@ def generate_transaction(workflow):
             print(e)
 
     transaction["spans"] = spans
+    print(transaction)
     return transaction
 
 
