@@ -3,6 +3,7 @@ import gzip
 import uuid
 from datetime import datetime
 
+from sentry_sdk import capture_exception
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import format_timestamp
 
@@ -51,7 +52,7 @@ def _generate_transaction(workflow):
         meta = get_extra_metadata(workflow["run_url"])
         transaction_name = f'{meta["name"]}/{workflow["name"]}'
     except Exception as e:
-        print(e)
+        capture_exception(e)
         print(f"Failed to process -> {workflow['run_url']}")
         transaction_name = {workflow["name"]}
 
@@ -95,7 +96,7 @@ def _generate_spans(steps, parent_span_id, trace_id):
             )
         except Exception as e:
             # XXX: Deal with this later
-            print(e)
+            capture_exception(e)
 
 
 # Documentation about traces, transactions and spans
@@ -112,7 +113,6 @@ def generate_transaction(workflow):
         transaction["contexts"]["trace"]["span_id"],
         transaction["contexts"]["trace"]["trace_id"],
     )
-    print(transaction)
     return transaction
 
 
