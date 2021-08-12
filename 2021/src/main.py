@@ -22,7 +22,7 @@ def handle_event(data, headers):
     if data["action"] != "completed":
         return ({"reason": "We cannot do anything with this workflow state."}, 200)
 
-    return process_data(data)
+    process_data(data)
 
 
 @app.route("/", methods=["POST"])
@@ -31,6 +31,6 @@ def main():
         payload, http_code = handle_event(request.json, request.headers)
     except Exception as e:
         capture_exception(e)
-        payload = {}
-        http_code = 200
+        payload = {"reason": "There was an error."}
+        http_code = 500
     return jsonify(payload), http_code

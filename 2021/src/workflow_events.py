@@ -46,18 +46,22 @@ def get_extra_metadata(workflow_run):
     return get(run_data["workflow_url"]).json()
 
 
-def _generate_transaction(workflow):
+def determine_job_name(workflow):
+    job_name = workflow["name"]
     try:
         # This helps to have human friendly transaction names
         meta = get_extra_metadata(workflow["run_url"])
-        transaction_name = f'{meta["name"]}/{workflow["name"]}'
+        job_name = f'{meta["name"]}/{workflow["name"]}'
     except Exception as e:
         capture_exception(e)
         print(f"Failed to process -> {workflow['run_url']}")
-        transaction_name = {workflow["name"]}
 
+    return job_name
+
+
+def _generate_transaction(workflow, job_name):
     transaction = base_transaction()
-    transaction["transaction"] = transaction_name
+    transaction["transaction"] = job_name
     # When processing old data during development, in Sentry's UI, you will
     # see an error for transactions with "Clock drift detected in SDK";
     # It is harmeless.
@@ -66,16 +70,16 @@ def _generate_transaction(workflow):
     transaction["contexts"]["trace"]["op"] = workflow["name"]
     # XXX: Determine what the failure state should look like
     transaction["contexts"]["trace"]["status"] = (
-        "ok" if workflow["conclusion"] else "failed",
+        "ok" if workflow["conclusion"] == "success" else "TBD"
     )
     transaction["contexts"]["trace"]["data"] = (workflow["html_url"],)
     # html_url points to the UI showing the job run
     # url points has the data to generate this transaction
-    # workflow_run has extra metadata about the workflow file
+    # run_url has extra metadata about the workflow file
     transaction["contexts"]["trace"]["tags"] = {
         "html_url": workflow["html_url"],
         "url": workflow["url"],
-        "workflow_run": workflow["run_url"],
+        "run_url": workflow["run_url"],
     }
     return transaction
 
@@ -97,6 +101,7 @@ def _generate_spans(steps, parent_span_id, trace_id):
         except Exception as e:
             # XXX: Deal with this later
             capture_exception(e)
+    return spans
 
 
 # Documentation about traces, transactions and spans
@@ -116,11 +121,25 @@ def generate_transaction(workflow):
     return transaction
 
 
+def generate_event(workflow, job_name):
+    for step in workflow["steps"]:
+        if step["conclusion"] != "success":
+            return {
+                "message": f"{job_name} failed",
+                "level": "error",
+                "tags": {"url": f'{workflow["html_url"]}/?check_suite_focus=true'},
+            }
+
+
 def process_data(data):
-    transaction = generate_transaction(data["workflow_job"])
-    if transaction:
-        envelope = Envelope()
-        envelope.add_transaction(transaction)
-        # XXX: Report on Sentry if the envelope failed to submit
+    workflow_job = data["workflow_job"]
+    job_name = determine_job_name(workflow_job)
+    envelope = Envelope()
+    # transaction = generate_transaction(workflow_job, job_name)
+    # if transaction:
+    #     envelope.add_transaction(transaction)
+    if workflow_job["conclusion"] == "failure":
+        event = generate_event(workflow_job, job_name)
+        envelope.add_event(event)
+    if envelope.items:
         send_envelope(envelope)
-    return {}, 200
