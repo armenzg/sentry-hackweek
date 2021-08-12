@@ -1,6 +1,6 @@
 from flask import jsonify, request, Flask
 
-from .lib import process_data
+from .workflow_events import process_data
 
 app = Flask(__name__)
 
@@ -21,6 +21,7 @@ def main():
     try:
         payload, http_code = handle_event(request.json, request.headers)
     except Exception as e:
+        # XXX: Report to Sentry
         print(e)
         payload = {}
         http_code = 200

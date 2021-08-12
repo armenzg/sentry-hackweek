@@ -1,0 +1,126 @@
+import io
+import gzip
+import uuid
+from datetime import datetime
+
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.utils import format_timestamp
+
+# XXX: To support calling script.py and flask run
+try:
+    from .lib import get, post, url_from_dsn
+    from .sentry import base_transaction
+except ImportError:
+    from lib import get, post, url_from_dsn
+    from sentry import base_transaction
+
+# FIX This is only for local development
+RELAY_DSN = "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451"
+
+
+def send_envelope(envelope):
+    headers = {
+        "event_id": uuid.uuid4().hex,  # Does this have to match anything?
+        "sent_at": format_timestamp(datetime.utcnow()),
+        "Content-Type": "application/x-sentry-envelope",
+        "Content-Encoding": "gzip",
+        "X-Sentry-Auth": "Sentry sentry_key=060c8c7a20ae472c8b32858cb41c36a7,"
+        + f"sentry_client=gha-sentry/0.0.1,sentry_timestamp={str(datetime.utcnow())},"
+        + "sentry_version=7",
+    }
+
+    body = io.BytesIO()
+    with gzip.GzipFile(fileobj=body, mode="w") as f:
+        envelope.serialize_into(f)
+
+    post(url_from_dsn(RELAY_DSN, "envelope"), headers=headers, body=body.getvalue())
+
+
+def get_extra_metadata(workflow_run):
+    req = get(workflow_run)
+    if not req.ok:
+        raise Exception(req.text)
+    run_data = req.json()
+    # XXX: We could enrich each transaction by having access to the yml file and/or the logs
+    return get(run_data["workflow_url"]).json()
+
+
+def _generate_transaction(workflow):
+    try:
+        # This helps to have human friendly transaction names
+        meta = get_extra_metadata(workflow["run_url"])
+        transaction_name = f'{meta["name"]}/{workflow["name"]}'
+    except Exception as e:
+        print(e)
+        print(f"Failed to process -> {workflow['run_url']}")
+        transaction_name = {workflow["name"]}
+
+    transaction = base_transaction()
+    transaction["transaction"] = transaction_name
+    # When processing old data during development, in Sentry's UI, you will
+    # see an error for transactions with "Clock drift detected in SDK";
+    # It is harmeless.
+    transaction["start_timestamp"] = workflow["started_at"]
+    transaction["timestamp"] = workflow["completed_at"]
+    transaction["contexts"]["trace"]["op"] = workflow["name"]
+    # XXX: Determine what the failure state should look like
+    transaction["contexts"]["trace"]["status"] = (
+        "ok" if workflow["conclusion"] else "failed",
+    )
+    transaction["contexts"]["trace"]["data"] = (workflow["html_url"],)
+    # html_url points to the UI showing the job run
+    # url points has the data to generate this transaction
+    # workflow_run has extra metadata about the workflow file
+    transaction["contexts"]["trace"]["tags"] = {
+        "html_url": workflow["html_url"],
+        "url": workflow["url"],
+        "workflow_run": workflow["run_url"],
+    }
+    return transaction
+
+
+def _generate_spans(steps, parent_span_id, trace_id):
+    spans = []
+    for step in steps:
+        try:
+            spans.append(
+                {
+                    "op": step["name"],
+                    "parent_span_id": parent_span_id,
+                    "span_id": uuid.uuid4().hex[16:],
+                    "start_timestamp": step["started_at"],
+                    "timestamp": step["completed_at"],
+                    "trace_id": trace_id,
+                }
+            )
+        except Exception as e:
+            # XXX: Deal with this later
+            print(e)
+
+
+# Documentation about traces, transactions and spans
+# https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
+def generate_transaction(workflow):
+    # This can happen when the workflow is skipped and there are no steps
+    if not workflow["steps"]:
+        print(f"We are ignoring {workflow['name']} -> {workflow['html_url']}")
+        return
+
+    transaction = _generate_transaction(workflow)
+    transaction["spans"] = _generate_spans(
+        workflow["steps"],
+        transaction["contexts"]["trace"]["span_id"],
+        transaction["contexts"]["trace"]["trace_id"],
+    )
+    print(transaction)
+    return transaction
+
+
+def process_data(data):
+    transaction = generate_transaction(data["workflow_job"])
+    if transaction:
+        envelope = Envelope()
+        envelope.add_transaction(transaction)
+        # XXX: Report on Sentry if the envelope failed to submit
+        send_envelope(envelope)
+    return {}, 200
