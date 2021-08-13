@@ -1,8 +1,15 @@
+import logging
+import os
 from flask import jsonify, request, Flask
 
 from .workflow_events import process_data
 
 from sentry_sdk import init, capture_exception
+
+
+LOGGING_LEVEL = os.environ.get("LOGGING_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(LOGGING_LEVEL)
 
 # This tracks errors and performance of the app itself rather than GH workflows
 init(
@@ -34,5 +41,6 @@ def main():
         payload, http_code = handle_event(request.json, request.headers)
     except Exception as e:
         capture_exception(e)
+        logging.exception(e)
 
     return jsonify(payload), http_code

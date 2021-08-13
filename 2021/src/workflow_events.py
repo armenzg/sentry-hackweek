@@ -59,6 +59,7 @@ def determine_job_name(workflow):
         job_name = f'{meta["name"]}/{workflow["name"]}'
     except Exception as e:
         capture_exception(e)
+        logging.exception(e)
         logging.error(f"Failed to process -> {workflow['run_url']}")
 
     return job_name
@@ -105,18 +106,19 @@ def _generate_spans(steps, parent_span_id, trace_id):
             )
         except Exception as e:
             capture_exception(e)
+            logging.exception(e)
     return spans
 
 
 # Documentation about traces, transactions and spans
 # https://docs.sentry.io/product/sentry-basics/tracing/distributed-tracing/#traces
-def generate_transaction(workflow):
+def generate_transaction(workflow, job_name):
     # This can happen when the workflow is skipped and there are no steps
     if not workflow["steps"]:
         logging.warn(f"We are ignoring {workflow['name']} -> {workflow['html_url']}")
         return
 
-    transaction = _generate_transaction(workflow)
+    transaction = _generate_transaction(workflow, job_name)
     transaction["spans"] = _generate_spans(
         workflow["steps"],
         transaction["contexts"]["trace"]["span_id"],
@@ -137,11 +139,12 @@ def generate_event(workflow, job_name):
 
 def process_data(data):
     workflow_job = data["workflow_job"]
+    # XXX: We can probably cache the function call rather than have to pass it down via parameter
     job_name = determine_job_name(workflow_job)
     envelope = Envelope()
-    # transaction = generate_transaction(workflow_job, job_name)
-    # if transaction:
-    #     envelope.add_transaction(transaction)
+    transaction = generate_transaction(workflow_job, job_name)
+    if transaction:
+        envelope.add_transaction(transaction)
     if workflow_job["conclusion"] == "failure":
         event = generate_event(workflow_job, job_name)
         envelope.add_event(event)

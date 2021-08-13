@@ -2,13 +2,13 @@ import os
 
 import requests
 
-GH_TOKEN = os.environ.get("TOKEN")
+GH_TOKEN = os.environ.get("GH_TOKEN")
 
 
 def get(url):
     headers = {}
     if GH_TOKEN and url.find("github.com") >= 0:
-        headers["Authorization"] = f"token ${GH_TOKEN}"
+        headers["Authorization"] = f"token {GH_TOKEN}"
     req = requests.get(url, headers=headers)
     if not req.ok:
         raise Exception(req.text)
@@ -17,7 +17,7 @@ def get(url):
 
 def post(url, body, headers={}):
     if GH_TOKEN and url.find("github.com") >= 0:
-        headers["Authorization"] = f"token ${GH_TOKEN}"
+        headers["Authorization"] = f"token {GH_TOKEN}"
     req = requests.post(url, data=body, headers=headers)
     if not req.ok:
         raise Exception(req.text)
