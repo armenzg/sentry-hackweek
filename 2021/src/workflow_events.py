@@ -15,8 +15,7 @@ except ImportError:
     from lib import get, post, url_from_dsn
     from sentry import base_transaction
 
-# FIX This is only for local development
-RELAY_DSN = "http://060c8c7a20ae472c8b32858cb41c36a7@127.0.0.1:3000/5899451"
+SENTRY_DSN = "https://060c8c7a20ae472c8b32858cb41c36a7@o19635.ingest.sentry.io/5899451"
 
 
 def send_envelope(envelope):
@@ -34,7 +33,7 @@ def send_envelope(envelope):
     with gzip.GzipFile(fileobj=body, mode="w") as f:
         envelope.serialize_into(f)
 
-    post(url_from_dsn(RELAY_DSN, "envelope"), headers=headers, body=body.getvalue())
+    post(url_from_dsn(SENTRY_DSN, "envelope"), headers=headers, body=body.getvalue())
 
 
 def get_extra_metadata(workflow_run):
