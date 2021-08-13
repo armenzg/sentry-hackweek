@@ -11,8 +11,6 @@ init(
     environment="development",
 )
 
-division_by_zero = 1 / 0
-
 app = Flask(__name__)
 
 
