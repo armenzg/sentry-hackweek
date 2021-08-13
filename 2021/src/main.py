@@ -23,14 +23,16 @@ def handle_event(data, headers):
         return ({"reason": "We cannot do anything with this workflow state."}, 200)
 
     process_data(data)
+    return {"reason": "OK"}, 200
 
 
 @app.route("/", methods=["POST"])
 def main():
+    payload = {"reason": "There was an error."}
+    http_code = 500
     try:
         payload, http_code = handle_event(request.json, request.headers)
     except Exception as e:
         capture_exception(e)
-        payload = {"reason": "There was an error."}
-        http_code = 500
+
     return jsonify(payload), http_code
