@@ -6,10 +6,12 @@ from sentry_sdk import init, capture_exception
 
 # This tracks errors and performance of the app itself rather than GH workflows
 init(
-    "https://16f104a1b76e4d69a1d7d075312254a7@o19635.ingest.sentry.io/5471241",
+    "https://86b85918a26246b2b6160820de5c6be1@o19635.ingest.sentry.io/5903949",
     traces_sample_rate=1.0,
     environment="development",
 )
+
+division_by_zero = 1 / 0
 
 app = Flask(__name__)
 

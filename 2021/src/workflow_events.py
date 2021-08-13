@@ -1,5 +1,7 @@
-import io
 import gzip
+import io
+import logging
+import os
 import uuid
 from datetime import datetime
 
@@ -14,6 +16,10 @@ try:
 except ImportError:
     from lib import get, post, url_from_dsn
     from sentry import base_transaction
+
+LOGGING_LEVEL = os.environ.get("LOGGING_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(LOGGING_LEVEL)
 
 SENTRY_DSN = "https://060c8c7a20ae472c8b32858cb41c36a7@o19635.ingest.sentry.io/5899451"
 
@@ -53,7 +59,7 @@ def determine_job_name(workflow):
         job_name = f'{meta["name"]}/{workflow["name"]}'
     except Exception as e:
         capture_exception(e)
-        print(f"Failed to process -> {workflow['run_url']}")
+        logging.error(f"Failed to process -> {workflow['run_url']}")
 
     return job_name
 
@@ -107,7 +113,7 @@ def _generate_spans(steps, parent_span_id, trace_id):
 def generate_transaction(workflow):
     # This can happen when the workflow is skipped and there are no steps
     if not workflow["steps"]:
-        print(f"We are ignoring {workflow['name']} -> {workflow['html_url']}")
+        logging.warn(f"We are ignoring {workflow['name']} -> {workflow['html_url']}")
         return
 
     transaction = _generate_transaction(workflow)
